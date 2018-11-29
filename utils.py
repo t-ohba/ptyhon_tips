@@ -4,9 +4,32 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 class visualization:
-    def view_variable_correlation_heatmap(df):
-        plt.figure(figsize=(18, 18))
-        sns.heatmap(df.corr(), square=True, cmap=plt.cm.viridis, linecolor='white', annot=True)
+    def view_variable_correlation_heatmap(X, Y, size=10):
+        """
+        plot figures that show correlation between the objective variable and the explanatory variables.
+
+        Parameters
+        ----------
+        X: pandas.DataFrame, shape=[n_sample, n_features]
+            explanatory variable vectors, where n_sample is the number of samples and n_features is the number of features.
+        Y: pandas.DataFrame, shape=[n_sample, 1]
+            objective variable vectors.
+        size: int
+            maximum number of features for which correlation with objective variables is displayed at once.
+        ----------
+        
+        """
+        max_num = len(X)
+        for i in range(max_num // size + 1):
+            column_list = []
+            min_idx = i*size
+            max_idx = np.min([(i+1)*size, max_num])
+            for j in range(min_idx, max_idx):
+                column_list.append(X.columns[j])
+            df = pd.concat([Y, X[column_list]], axis=1])
+            plt.figure(figsize=(18, 18))
+            sns.heatmap(df.corr(), square=True, cmap=plt.cm.viridis, linecolor='white', annot=True)
+            plt.show()
 
     def view_variable_scatter_plot(df):
         plt.figure(figsize=(18, 18))
