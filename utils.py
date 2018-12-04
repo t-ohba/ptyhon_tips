@@ -270,3 +270,56 @@ from sklearn.utils import shuffle
             plt.savefig(file_name)
         else:
             plt.show()
+
+class modeling:
+    def create_model():
+        # ハイパーパラメータのチューニング１：グリッドサーチ
+        lr = LogisticRegression(penalty='l1')     # ロジスティック回帰（L1正則化）
+        params = {'C': [0.001*i for i in range(1, 10)]} # ハイパーパラメータの候補
+        n_cv = 5                                   # 交差検証の分割数
+        kfold = StratifiedKFold(n_splits=n_cv, random_state=1)                                            # 層化k分割交差検証（各サブセットでのクラスの比率を維持して交差検証）
+        grid = GridSearchCV(estimator=lr, param_grid=params, scoring='roc_auc', cv=kfold, verbose=False)  # ハイパーパラメータをグリッドサーチ
+        grid.fit(X_train_std, Y_train)
+        print('selected params:', grid.best_params_)
+
+
+        # ハイパーパラメータのチューニング２：ベイズ最適化
+
+        def get_score(X_train, Y_train, **params):
+        lr = LogisticRegression(penalty='l1', **params)
+        kfold = StratifiedKFold(n_splits=5, shuffle=True, random_state=1)
+        scores = cross_val_score(lr, X_train, Y_train, cv=kfold)
+        return scores.mean()
+
+        pf = functools.partial(get_score, X_train_std, Y_train)
+        pbounds = {'C': (1e-5, 1.0)}
+
+        bo = BayesianOptimization(f=pf, pbounds=pbounds)
+        bo.maximize(init_points=3, n_iter=20)
+        print(bo.res['max'])
+
+        # ロジスティック回帰でモデル構築
+        lr = LogisticRegression(penalty='l1', C=grid.best_params_['C'])           # グリッドサーチでチューニングしたハイパーパラメータを使ってモデル構築
+        #lr = LogisticRegression(penalty='l1', C=bo.res['max']['max_params']['C'])  # ベイズ最適化でチューニングしたハイパーパラメータを使ってモデル構築
+        #lr = LogisticRegression(penalty='l1', C=0.01')
+        lr.fit(X_train_std, Y_train)
+
+
+        # lightGBMでモデル構築
+        gbm = LGBMClassifier() 
+        params = {                               # ハイパーパラメータの候補
+            'learning_rate': [0.05, 0.1, 0.15],  # 学習率
+            'num_leaves': [20, 30, 40],          # ひとつの決定木に含まれる葉の最大数
+            'n_estimators': [100, 200, 300]}     # ブースティングの回数
+        n_cv = 5                                 # 交差検証の分割数
+        kfold = StratifiedKFold(n_splits=n_cv, random_state=1)                                            # 層化k分割交差検証（各サブセットでのクラスの比率を維持して交差検証）
+        grid = GridSearchCV(estimator=gbm, param_grid=params, scoring='roc_auc', cv=kfold, verbose=False)  # ハイパーパラメータをグリッドサーチ
+        grid.fit(X_train_std, Y_train)
+        print('best param: learning_rate = ', grid.best_params_['learning_rate'])
+        print('best param: num_leaves = ', grid.best_params_['num_leaves'])
+        print('best param: n_estimators = ', grid.best_params_['n_estimators'])
+
+        # lightGBM
+        gbm = LGBMClassifier(learning_rate=grid.best_params_['learning_rate'], num_leaves=grid.best_params_['num_leaves'], num_iterations=grid.best_params_['n_estimators'])
+        gbm.fit(X_train_std, Y_train)
+
